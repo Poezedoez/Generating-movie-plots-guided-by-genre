@@ -1,6 +1,7 @@
 import pandas as pd
 import torch
 import json
+import nltk
 from collections import defaultdict
 
 
@@ -8,38 +9,38 @@ END_OF_SENTENCE_TAG = '<EOS>'
 UNKNOWN_TAG = '<UNK>'
 END_OF_PARAGRAPH_TAG = '<EOP>'
 VOCAB_LOCATION = 'assets/vocab.json'
+PADDING_TAG = 0
 
 df = pd.read_csv('data/movies_genres.csv', sep='\t')
 
-def transform_word(word):
-  return word.lower()
 
+""" 
+  dit is een zin. met nog, een zinnetje; plus dit. -> dit is een zin . met nog , een zinnetje ; plus dit .
+"""
 
-def custom_split(seperators, string):
-  result = []
-  partial = ""
-  for character in string:
-    if character
-    if character in seperators:
-      result.append(partial)
-      partial = ""
-    else:
-      partial += character
+def map_word(word, index, sample_length):
+  word = word.lower()
+  if word == ".":
+    return END_OF_SENTENCE_TAG
 
-  return result
+  if (index - 1) == sample_length:
+    return END_OF_PARAGRAPH_TAG
 
+  return word
 
 def create_vocab():
   # if word is unknown, return corresponding index of <UNK>
-  vocab = defaultdict(lambda: 0)
+  vocab = defaultdict(lambda: 1)
 
-  vocab[UNKNOWN_TAG] = 0
+  vocab[PADDING_TAG] = 0
+  vocab[UNKNOWN_TAG] = 1
   vocab[END_OF_SENTENCE_TAG] = 1
   vocab[END_OF_PARAGRAPH_TAG] = 2
 
   for _, row in df.iterrows():
-    for word in custom_split([' ', '.'], row['plot']):
-      transformed_word = transform_word(word)
+    tokenized = nltk.word_tokenize(row['plot'])
+    for word, index in zip(tokenized, range(len(tokenized))):
+      transformed_word = map_word(word, index, len(tokenized))
       if (transformed_word not in vocab):
         vocab[transformed_word] = len(vocab)
 
@@ -52,36 +53,27 @@ except FileNotFoundError:
   vocab = create_vocab()
   with open(VOCAB_LOCATION, 'w') as f:
     json.dump(vocab, f)
-
-
-def map_word(word, index, sample_length):
-  if word == ".":
-    return END_OF_SENTENCE_TAG
-
-  if (index - 1) == sample_length:
-    return END_OF_PARAGRAPH_TAG
-
-  return word
   
 
 def create_feature_vector(sample):
-  return [
-    vocab[map_word(word, index, len(sample))]
-    for word, index in zip(sample, range(len(sample)))
-  ]
+  tokenized = nltk.word_tokenize(sample)
+  return torch.LongTensor([
+    vocab[map_word(word, index, len(tokenized))]
+    for word, index in zip(tokenized, range(len(tokenized)))
+  ])
 
 
-def load_batch(batch_size=256):
+def load_batch(batch_size=5):
     sampled = df.sample(batch_size)
 
     features = [
-        create_feature_vector(sample)
-        for sample in sampled
+        create_feature_vector(sample['plot'])
+        for _, sample in sampled.iterrows()
     ]
 
-    print(features)
+    return torch.nn.utils.rnn.pad_sequence(features, batch_first=True)
 
-    yield torch.LongTensor(features)
+VOCAB_SIZE = len(vocab)
 
 if __name__ == "__main__":
   i = 0
@@ -89,5 +81,5 @@ if __name__ == "__main__":
     i = i + 1
     print(batch)
 
-    if i == 5:
+    if i == 1:
       break
