@@ -73,6 +73,11 @@ def load_batch(batch_size=5):
 
     return torch.nn.utils.rnn.pad_sequence(features, batch_first=True)
 
+
+def load_data():
+    
+
+
 VOCAB_SIZE = len(vocab)
 
 if __name__ == "__main__":
