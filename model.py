@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class Encoder(nn.Module):
     def __init__(self, vocab_size, lstm_dim=100, z_dim=100, emb_dim=100):
         super(Encoder, self).__init__()
@@ -21,12 +22,12 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(self,
-        vocab_size,
-        batch_size,
-        lstm_dim=100,
-        z_dim=100,
-        emb_dim=100
-    ):
+                 vocab_size,
+                 batch_size,
+                 lstm_dim=100,
+                 z_dim=100,
+                 emb_dim=100
+                 ):
         super(Decoder, self).__init__()
 
         self.lstm = nn.LSTM(emb_dim, lstm_dim, num_layers=1, batch_first=True)
@@ -34,12 +35,12 @@ class Decoder(nn.Module):
         self.lstm_to_vocab = nn.Linear(lstm_dim, vocab_size)
         self.batch_size = batch_size
         self.lstm_dim = lstm_dim
-        
+
     def forward(self, embedded, z):
         hidden = self.z_to_hidden(z)
         # reshaped = hidden.view(1,  self.lstm_dim, self.batch_size)
         print("hidden", hidden.size())
-        random = torch.rand_like(hidden) # dummy variable
+        random = torch.rand_like(hidden)  # dummy variable
         decoded, _ = self.lstm(embedded, (hidden, random))
         return decoded
 
@@ -69,12 +70,13 @@ class VAE(nn.Module):
         return average_negative_elbo
 
     def reparameterize(self, mean, logvar)
-        std = torch.exp(0.5*logvar)
-        eps = torch.randn_like(std, device=self.device)
-        return mean + std*eps
+    std = torch.exp(0.5*logvar)
+    eps = torch.randn_like(std, device=self.device)
+    return mean + std*eps
 
     def elbo_loss_function(self, logp, target, max_seq_length, mean, logvar):
-        target = target[:, :torch.max(max_seq_length).data[0]].contiguous().view(-1)
+        target = target[:, :torch.max(
+            max_seq_length).data[0]].contiguous().view(-1)
         logp = logp.view(-1, logp.size(2))
 
         # Negative log likelihood
