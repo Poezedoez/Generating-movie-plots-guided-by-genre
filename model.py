@@ -30,16 +30,15 @@ class Decoder(nn.Module):
 
     self.lstm = nn.LSTM(emb_dim, lstm_dim, num_layers=1, batch_first=True)
     self.z_to_hidden = nn.Linear(z_dim, lstm_dim)
+    self.z_to_cell = nn.Linear(z_dim, lstm_dim)
     self.lstm_to_vocab = nn.Linear(lstm_dim, vocab_size)
     self.batch_size = batch_size
     self.lstm_dim = lstm_dim
     
   def forward(self, embedded, z):
-    hidden = self.z_to_hidden(z)
-    # reshaped = hidden.view(1,  self.lstm_dim, self.batch_size)
-    print("hidden", hidden.size())
-    random = torch.rand_like(hidden) # dummy variable
-    decoded, _ = self.lstm(embedded, (hidden, random))
+    initial_hidden = self.z_to_hidden(z)
+    initial_cell = self.z_to_cell
+    decoded, _ = self.lstm(embedded, (initial_hidden, initial_cell))
     return decoded
 
 
