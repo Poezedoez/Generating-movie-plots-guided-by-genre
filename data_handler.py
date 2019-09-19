@@ -34,8 +34,8 @@ def create_vocab():
 
   vocab[PADDING_TAG] = 0
   vocab[UNKNOWN_TAG] = 1
-  vocab[END_OF_SENTENCE_TAG] = 1
-  vocab[END_OF_PARAGRAPH_TAG] = 2
+  vocab[END_OF_SENTENCE_TAG] = 2
+  vocab[END_OF_PARAGRAPH_TAG] = 3
 
   for _, row in df.iterrows():
     tokenized = nltk.word_tokenize(row['plot'])
