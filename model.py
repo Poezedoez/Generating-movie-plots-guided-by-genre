@@ -39,6 +39,9 @@ class Decoder(nn.Module):
     initial_hidden = self.z_to_hidden(z)
     initial_cell = self.z_to_cell
     decoded, _ = self.lstm(embedded, (initial_hidden, initial_cell))
+    logits = lstm_to_vocab(decoded)
+    probabilities = F.log_softmax(logits, dim=-1)
+
     return decoded
 
 
