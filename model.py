@@ -44,7 +44,7 @@ class Decoder(nn.Module):
     logits = self.lstm_to_vocab(decoded)
     probabilities = F.log_softmax(logits, dim=-1)
 
-    return decoded
+    return probabilities
 
 
 class VAE(nn.Module):
@@ -55,18 +55,18 @@ class VAE(nn.Module):
 
     self.batch_size = batch_size
     self.device = device
-    self.embedding = nn.Embedding(vocab_size, emb_dim)
+    self.embedding = nn.Embedding(vocab_size, emb_dim).to(device)
     self.encoder = Encoder(vocab_size, lstm_dim, z_dim, emb_dim)
     self.decoder = Decoder(vocab_size, batch_size, lstm_dim, z_dim)
     # 0 = padding index
-    self.NNL = nn.NLLLoss(size_average=False, ignore_index=0)
+    self.NLL = nn.NLLLoss(size_average=False, ignore_index=0)
 
   def forward(self, x):
     max_seq_length = x.size()[1]
     embedded = self.embedding(x)
     mean, logvar = self.encoder(embedded)
     z = self.reparameterize(mean, logvar)
-    logp, reconstruction = self.decoder(embedded, z)
+    logp = self.decoder(embedded, z)
     average_negative_elbo = self.elbo_loss_function(
       logp, x, max_seq_length, mean, logvar,
     )
@@ -78,15 +78,14 @@ class VAE(nn.Module):
     return mean + std*eps
 
   def elbo_loss_function(self, logp, target, max_seq_length, mean, logvar):
-    target = target[:, :torch.max(
-        max_seq_length).data[0]].contiguous().view(-1)
+    target = target[:, :max_seq_length].contiguous().view(-1)
     logp = logp.view(-1, logp.size(2))
 
     # Negative log likelihood
-    NLL_loss = self.NLL(logp, target)
+    nll_loss = self.NLL(logp, target)
 
     # KL Divergence
-    KL_LOSS = -0.5 * torch.sum(1 + logvar - mean.pow(2) - logvar.exp())
+    kl_loss = -0.5 * torch.sum(1 + logvar - mean.pow(2) - logvar.exp())
     # TODO: add KL annealing
 
-    return (NLL_LOSS + KL_loss) / self.batch_size
+    return (nll_loss + kl_loss) / self.batch_size
