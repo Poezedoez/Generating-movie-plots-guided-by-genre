@@ -74,7 +74,9 @@ class VAE(nn.Module):
 
   def forward(self, input_seq, target_seq, lengths):
     """"""
-    # Sort the input sequences by their sequence length in descending order
+    # Sort the input sequences by their sequence length in descending order.
+    # We do this because rnn_utils.pack_padded_sequence expects sequences
+    # sorted by length in a decreasing order.
     sorted_lengths, sorted_indices = torch.sort(lengths, descending=True)
     input_seq_sorted = input_seq[sorted_indices]
     # Perform word embedding on input sequences
