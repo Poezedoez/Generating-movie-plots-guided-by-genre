@@ -30,6 +30,7 @@ def epoch_iter(model, datasets, device, optimizer, data_type):
       elbo.backward()
       optimizer.step()
     elbo_loss += elbo.item()
+    print(f"[Batch {i}/{len(data_loader)}, type: {data_type}, elbo: {elbo.item()}]")
   return elbo_loss / (i+1)
 
 
@@ -57,7 +58,7 @@ def main(ARGS, device):
   testing. Then, initializes the VAE model and runs the training (/validation)
   process for a given number of epochs.
   """
-  data_splits = ['train', 'val']
+  data_splits = ['train']
   datasets = {
     split: IMDB(ARGS.data_dir, split, ARGS.max_sequence_length, ARGS.min_word_occ)
       for split in data_splits

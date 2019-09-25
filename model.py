@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.nn.utils.rnn as rnn_utils
 
 
 class Encoder(nn.Module):
@@ -44,12 +45,10 @@ class Decoder(nn.Module):
 
     decoded_packed = rnn_utils.pad_packed_sequence(decoded, batch_first=True)[0].contiguous()
     _, reversed_indices = torch.sort(sorted_indices)
-    decoded_pakced = decoded_packed[reversed_indices]
-    b, s, _ = decoded_packed.size()
+    decoded_packed = decoded_packed[reversed_indices]
 
     logits = self.lstm_to_vocab(decoded_packed)
     logp = F.log_softmax(logits, dim=-1)
-    logp = logp.view(b, s, self.embedding.num_embeddings)
 
     return logp
 
@@ -82,7 +81,7 @@ class VAE(nn.Module):
     mean, logvar = self.encoder(input_seq_packed)
     z = self.reparameterize(mean, logvar)
     # NOTE: use input_seq_packed OR ((maybe add dropout and) + embedding dropout -> pack sequence)
-    logp = self.decoder(input_seq_packed, z)
+    logp = self.decoder(input_seq_packed, z, sorted_indices)
     average_negative_elbo = self.elbo_loss_function(
       logp, target_seq, lengths, mean, logvar,
     )
