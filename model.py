@@ -39,7 +39,7 @@ class Decoder(nn.Module):
     self.batch_size = batch_size
     self.lstm_dim = lstm_dim
     
-  def forward(self, embedded, z, sorted_indices):
+  def forward(self, embedded, z):
     initial_hidden = self.z_to_hidden(z)
     initial_cell = self.z_to_cell(z)
     decoded, _ = self.lstm(embedded, (initial_hidden, initial_cell))
@@ -82,7 +82,7 @@ class VAE(nn.Module):
     mean, logvar = self.encoder(input_seq_packed)
     z = self.reparameterize(mean, logvar)
     # NOTE: use input_seq_packed OR ((maybe add dropout and) + embedding dropout -> pack sequence)
-    logp = self.decoder(input_seq_packed, z, sorted_indices)
+    logp = self.decoder(input_seq_packed, z)
     # Revert back the order of the input since we have previously
     # sorted the input in descending order based on their sequence length.
     # We need to set it back to the original order for when calculating
