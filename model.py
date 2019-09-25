@@ -27,10 +27,11 @@ class Decoder(nn.Module):
     batch_size,
     lstm_dim=100,
     z_dim=100,
-    emb_dim=100
+    emb_dim=100,
   ):
     super(Decoder, self).__init__()
 
+    self.emb_dim = emb_dim
     self.lstm = nn.LSTM(emb_dim, lstm_dim, num_layers=1, batch_first=True)
     self.z_to_hidden = nn.Linear(z_dim, lstm_dim)
     self.z_to_cell = nn.Linear(z_dim, lstm_dim)
@@ -44,6 +45,10 @@ class Decoder(nn.Module):
     decoded, _ = self.lstm(embedded, (initial_hidden, initial_cell))
 
     decoded_packed = rnn_utils.pad_packed_sequence(decoded, batch_first=True)[0].contiguous()
+    # Revert back the order of the input since we have previously
+    # sorted the input in descending order based on their sequence length.
+    # We need to set it back to the original order for when calculating
+    # the ELBO loss.
     _, reversed_indices = torch.sort(sorted_indices)
     decoded_packed = decoded_packed[reversed_indices]
 
@@ -63,7 +68,7 @@ class VAE(nn.Module):
     self.device = device
     self.embedding = nn.Embedding(vocab_size, emb_dim).to(device)
     self.encoder = Encoder(vocab_size, lstm_dim, z_dim, emb_dim)
-    self.decoder = Decoder(vocab_size, batch_size, lstm_dim, z_dim)
+    self.decoder = Decoder(vocab_size, batch_size, lstm_dim, z_dim, emb_dim)
     # 0 = padding index
     self.NLL = nn.NLLLoss(size_average=False, ignore_index=0)
 
