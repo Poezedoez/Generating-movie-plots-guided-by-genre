@@ -44,15 +44,9 @@ class Decoder(nn.Module):
     initial_cell = self.z_to_cell(z)
     decoded, _ = self.lstm(embedded, (initial_hidden, initial_cell))
 
-    decoded_packed = rnn_utils.pad_packed_sequence(decoded, batch_first=True)[0].contiguous()
-    # Revert back the order of the input since we have previously
-    # sorted the input in descending order based on their sequence length.
-    # We need to set it back to the original order for when calculating
-    # the ELBO loss.
-    _, reversed_indices = torch.sort(sorted_indices)
-    decoded_packed = decoded_packed[reversed_indices]
+    decoded_padded = rnn_utils.pad_packed_sequence(decoded, batch_first=True)[0].contiguous()
 
-    logits = self.lstm_to_vocab(decoded_packed)
+    logits = self.lstm_to_vocab(decoded_padded)
     logp = F.log_softmax(logits, dim=-1)
 
     return logp
@@ -89,6 +83,12 @@ class VAE(nn.Module):
     z = self.reparameterize(mean, logvar)
     # NOTE: use input_seq_packed OR ((maybe add dropout and) + embedding dropout -> pack sequence)
     logp = self.decoder(input_seq_packed, z, sorted_indices)
+    # Revert back the order of the input since we have previously
+    # sorted the input in descending order based on their sequence length.
+    # We need to set it back to the original order for when calculating
+    # the ELBO loss.
+    _, reversed_indices = torch.sort(sorted_indices)
+    logp = logp[reversed_indices]
     average_negative_elbo = self.elbo_loss_function(
       logp, target_seq, lengths, mean, logvar,
     )
