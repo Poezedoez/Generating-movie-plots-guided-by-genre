@@ -37,14 +37,21 @@ class Decoder(nn.Module):
     self.batch_size = batch_size
     self.lstm_dim = lstm_dim
     
-  def forward(self, embedded, z):
+  def forward(self, embedded, z, sorted_indices):
     initial_hidden = self.z_to_hidden(z)
     initial_cell = self.z_to_cell(z)
     decoded, _ = self.lstm(embedded, (initial_hidden, initial_cell))
-    logits = self.lstm_to_vocab(decoded)
-    probabilities = F.log_softmax(logits, dim=-1)
 
-    return probabilities
+    decoded_packed = rnn_utils.pad_packed_sequence(decoded, batch_first=True)[0].contiguous()
+    _, reversed_indices = torch.sort(sorted_indices)
+    decoded_pakced = decoded_packed[reversed_indices]
+    b, s, _ = decoded_packed.size()
+
+    logits = self.lstm_to_vocab(decoded_packed)
+    logp = F.log_softmax(logits, dim=-1)
+    logp = logp.view(b, s, self.embedding.num_embeddings)
+
+    return logp
 
 
 class VAE(nn.Module):
@@ -61,14 +68,23 @@ class VAE(nn.Module):
     # 0 = padding index
     self.NLL = nn.NLLLoss(size_average=False, ignore_index=0)
 
-  def forward(self, x):
-    max_seq_length = x.size()[1]
-    embedded = self.embedding(x)
-    mean, logvar = self.encoder(embedded)
+  def forward(self, input_seq, target_seq, lengths):
+    """"""
+    # Sort the input sequences by their sequence length in descending order
+    sorted_lengths, sorted_indices = torch.sort(lengths, descending=True)
+    input_seq_sorted = input_seq[sorted_indices]
+    # Perform word embedding on input sequences
+    input_seq_embedded = self.embedding(input_seq_sorted)
+    # Pack the padded input sequences
+    input_seq_packed = rnn_utils.pack_padded_sequence(
+      input_seq_embedded, sorted_lengths.data.tolist(), batch_first=True)
+
+    mean, logvar = self.encoder(input_seq_packed)
     z = self.reparameterize(mean, logvar)
-    logp = self.decoder(embedded, z)
+    # NOTE: use input_seq_packed OR ((maybe add dropout and) + embedding dropout -> pack sequence)
+    logp = self.decoder(input_seq_packed, z)
     average_negative_elbo = self.elbo_loss_function(
-      logp, x, max_seq_length, mean, logvar,
+      logp, target_seq, lengths, mean, logvar,
     )
     return average_negative_elbo
 
@@ -77,8 +93,9 @@ class VAE(nn.Module):
     eps = torch.randn_like(std, device=self.device)
     return mean + std*eps
 
-  def elbo_loss_function(self, logp, target, max_seq_length, mean, logvar):
-    target = target[:, :max_seq_length].contiguous().view(-1)
+  def elbo_loss_function(self, logp, target, length, mean, logvar):
+    # cut-off unnecessary padding from target, and flatten
+    target = target[:, :torch.max(length).item()].contiguous().view(-1)
     logp = logp.view(-1, logp.size(2))
 
     # Negative log likelihood
@@ -88,4 +105,5 @@ class VAE(nn.Module):
     kl_loss = -0.5 * torch.sum(1 + logvar - mean.pow(2) - logvar.exp())
     # TODO: add KL annealing
 
-    return (nll_loss + kl_loss) / self.batch_size
+    batch_size = target.size(0)
+    return (nll_loss + kl_loss) / batch_size
