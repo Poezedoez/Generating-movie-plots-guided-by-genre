@@ -29,6 +29,7 @@ def epoch_iter(model, datasets, device, optimizer, data_type):
     if model.training:
       elbo.backward()
       optimizer.step()
+      model.kl_anneal_step()
     elbo_loss += elbo.item()
   return elbo_loss / (i+1)
 
@@ -62,7 +63,11 @@ def main(ARGS, device):
     split: IMDB(ARGS.data_dir, split, ARGS.max_sequence_length, ARGS.min_word_occ)
       for split in data_splits
   }
-  model = VAE(datasets['train'].vocab_size, ARGS.batch_size, device)
+  model = VAE(
+    datasets['train'].vocab_size, ARGS.batch_size, device,
+    kl_anneal_type=ARGS.kl_anneal_type, kl_anneal_x0=ARGS.kl_anneal_x0,
+    kl_anneal_k=ARGS.kl_anneal_k,
+  )
   model.to(device)
 
   optimizer = torch.optim.Adam(model.parameters())
@@ -91,6 +96,10 @@ if __name__ == "__main__":
                       help='max allowed length of the sequence')
   parser.add_argument('--min_word_occ', default='3', type=int,
                       help='only add word to vocabulary if occurence higher than this value')
+  
+  parser.add_argument('-kl_af', '--kl_anneal_type', type=str, default='logistic')
+  parser.add_argument('-kl_k', '--kl_anneal_k', type=float, default=0.0025)
+  parser.add_argument('-kl_x0', '--kl_anneal_x0', type=int, default=2500)
 
   ARGS = parser.parse_args()
   device = torch.device(ARGS.device)
