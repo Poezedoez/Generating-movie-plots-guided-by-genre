@@ -27,10 +27,11 @@ class Decoder(nn.Module):
     batch_size,
     lstm_dim=100,
     z_dim=100,
-    emb_dim=100
+    emb_dim=100,
   ):
     super(Decoder, self).__init__()
 
+    self.emb_dim = emb_dim
     self.lstm = nn.LSTM(emb_dim, lstm_dim, num_layers=1, batch_first=True)
     self.z_to_hidden = nn.Linear(z_dim, lstm_dim)
     self.z_to_cell = nn.Linear(z_dim, lstm_dim)
@@ -38,16 +39,14 @@ class Decoder(nn.Module):
     self.batch_size = batch_size
     self.lstm_dim = lstm_dim
     
-  def forward(self, embedded, z, sorted_indices):
+  def forward(self, embedded, z):
     initial_hidden = self.z_to_hidden(z)
     initial_cell = self.z_to_cell(z)
     decoded, _ = self.lstm(embedded, (initial_hidden, initial_cell))
 
-    decoded_packed = rnn_utils.pad_packed_sequence(decoded, batch_first=True)[0].contiguous()
-    _, reversed_indices = torch.sort(sorted_indices)
-    decoded_packed = decoded_packed[reversed_indices]
+    decoded_padded = rnn_utils.pad_packed_sequence(decoded, batch_first=True)[0].contiguous()
 
-    logits = self.lstm_to_vocab(decoded_packed)
+    logits = self.lstm_to_vocab(decoded_padded)
     logp = F.log_softmax(logits, dim=-1)
 
     return logp
@@ -63,13 +62,15 @@ class VAE(nn.Module):
     self.device = device
     self.embedding = nn.Embedding(vocab_size, emb_dim).to(device)
     self.encoder = Encoder(vocab_size, lstm_dim, z_dim, emb_dim)
-    self.decoder = Decoder(vocab_size, batch_size, lstm_dim, z_dim)
+    self.decoder = Decoder(vocab_size, batch_size, lstm_dim, z_dim, emb_dim)
     # 0 = padding index
     self.NLL = nn.NLLLoss(size_average=False, ignore_index=0)
 
   def forward(self, input_seq, target_seq, lengths):
     """"""
-    # Sort the input sequences by their sequence length in descending order
+    # Sort the input sequences by their sequence length in descending order.
+    # We do this because rnn_utils.pack_padded_sequence expects sequences
+    # sorted by length in a decreasing order.
     sorted_lengths, sorted_indices = torch.sort(lengths, descending=True)
     input_seq_sorted = input_seq[sorted_indices]
     # Perform word embedding on input sequences
@@ -81,7 +82,13 @@ class VAE(nn.Module):
     mean, logvar = self.encoder(input_seq_packed)
     z = self.reparameterize(mean, logvar)
     # NOTE: use input_seq_packed OR ((maybe add dropout and) + embedding dropout -> pack sequence)
-    logp = self.decoder(input_seq_packed, z, sorted_indices)
+    logp = self.decoder(input_seq_packed, z)
+    # Revert back the order of the input since we have previously
+    # sorted the input in descending order based on their sequence length.
+    # We need to set it back to the original order for when calculating
+    # the ELBO loss.
+    _, reversed_indices = torch.sort(sorted_indices)
+    logp = logp[reversed_indices]
     average_negative_elbo = self.elbo_loss_function(
       logp, target_seq, lengths, mean, logvar,
     )
