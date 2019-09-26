@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -53,13 +54,22 @@ class Decoder(nn.Module):
 
 
 class VAE(nn.Module):
-  def __init__(self, vocab_size, batch_size, device, lstm_dim=100,
-                z_dim=100, emb_dim=100):
+  def __init__(
+      self, vocab_size, batch_size, device,
+      lstm_dim=100, z_dim=100, emb_dim=100,
+      kl_anneal_type=None, kl_anneal_x0=None, kl_anneal_k=None
+  ):
 
     super(VAE, self).__init__()
 
     self.batch_size = batch_size
     self.device = device
+
+    self.step = 0
+    self.kl_anneal_type = kl_anneal_type
+    self.kl_anneal_x0 = kl_anneal_x0
+    self.kl_anneal_k = kl_anneal_k
+
     self.embedding = nn.Embedding(vocab_size, emb_dim).to(device)
     self.encoder = Encoder(vocab_size, lstm_dim, z_dim, emb_dim)
     self.decoder = Decoder(vocab_size, batch_size, lstm_dim, z_dim, emb_dim)
@@ -109,7 +119,19 @@ class VAE(nn.Module):
 
     # KL Divergence
     kl_loss = -0.5 * torch.sum(1 + logvar - mean.pow(2) - logvar.exp())
-    # TODO: add KL annealing
+    kl_weight = self.kl_anneal_function()
+    print('kl weight', kl_weight)
 
     batch_size = target.size(0)
-    return (nll_loss + kl_loss) / batch_size
+    return (nll_loss + kl_weight * kl_loss) / batch_size
+  
+  def kl_anneal_step(self):
+    self.step += 1
+  
+  def kl_anneal_function(self):
+    """"""
+    if self.kl_anneal_type == 'logistic':
+      return float(1/(1+np.exp(-self.kl_anneal_k*(self.step-self.kl_anneal_x0))))
+    elif self.kl_anneal_type == 'linear':
+      return min(1, self.step/self.kl_anneal_x0)
+    return 1
