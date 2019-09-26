@@ -120,7 +120,6 @@ class VAE(nn.Module):
     # KL Divergence
     kl_loss = -0.5 * torch.sum(1 + logvar - mean.pow(2) - logvar.exp())
     kl_weight = self.kl_anneal_function()
-    print('kl weight', kl_weight)
 
     batch_size = target.size(0)
     return (nll_loss + kl_weight * kl_loss) / batch_size
