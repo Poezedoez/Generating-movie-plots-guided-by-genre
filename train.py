@@ -30,7 +30,6 @@ def epoch_iter(model, datasets, device, optimizer, data_type):
       elbo.backward()
       optimizer.step()
     elbo_loss += elbo.item()
-    print(f"[Batch {i}/{len(data_loader)}, type: {data_type}, elbo: {elbo.item()}]")
   return elbo_loss / (i+1)
 
 
@@ -65,12 +64,17 @@ def main(ARGS, device):
   }
   model = VAE(datasets['train'].vocab_size, ARGS.batch_size, device)
   model.to(device)
+
   optimizer = torch.optim.Adam(model.parameters())
 
   for epoch in range(ARGS.epochs):
     elbos = run_epoch(model, datasets, device, optimizer)
     train_elbo, val_elbo = elbos
     print(f"[Epoch {epoch} train elbo: {train_elbo}, val_elbo: {val_elbo}]")
+    for _ in range(5):
+      infered = model.inference(datasets['train'])
+      print(f"\n [Infered sentence: {infered} \n")
+
 
 
 if __name__ == "__main__":

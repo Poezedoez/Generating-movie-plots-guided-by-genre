@@ -65,6 +65,7 @@ class VAE(nn.Module):
     self.decoder = Decoder(vocab_size, batch_size, lstm_dim, z_dim, emb_dim)
     # 0 = padding index
     self.NLL = nn.NLLLoss(size_average=False, ignore_index=0)
+    self.latent_size = z_dim
 
   def forward(self, input_seq, target_seq, lengths):
     """"""
@@ -113,3 +114,33 @@ class VAE(nn.Module):
 
     batch_size = target.size(0)
     return (nll_loss + kl_loss) / batch_size
+
+  def sample(self, p):
+    return torch.distributions.Categorical(p).sample()
+
+  def sentence_mapping(self, imdb, sequence):
+    return " ".join([imdb.i2w[str(idx)] for idx in sequence if idx != imdb.unk_idx and idx != imdb.sos_idx and idx != imdb.eos_idx]) + "."
+
+  def inference(self, imdb, max_seq_len=100, z=None):
+        
+    if z is None:
+      z = torch.randn((1, self.latent_size), device=self.device)
+    
+    hidden = self.decoder.z_to_hidden(z).unsqueeze(1)
+    cell = self.decoder.z_to_cell(z).unsqueeze(1)
+
+    # initialize sequence
+    sequence = [imdb.sos_idx] + [imdb.unk_idx for _ in range(max_seq_len - 1)] 
+
+    for i in range(1, max_seq_len):
+      emb = self.embedding(torch.LongTensor(sequence).to(self.device)).unsqueeze(0)
+
+      decoded, hidden_cell = self.decoder.lstm(emb, (hidden, cell))
+      hidden, cell = hidden_cell
+      logp = F.softmax(self.decoder.lstm_to_vocab(decoded), dim=-1)
+      predicted = self.sample(logp[:, i]).item()
+      sequence[i] = predicted
+      if predicted == imdb.eos_idx:
+        return self.sentence_mapping(imdb, sequence)
+
+    return self.sentence_mapping(imdb, sequence)
