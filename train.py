@@ -25,7 +25,7 @@ def epoch_iter(model, datasets, device, optimizer, data_type):
   for i, batch in enumerate(data_loader):
     if model.training:
       optimizer.zero_grad()
-    elbo = model(batch['input'], batch['target'], batch['length'])
+    elbo = model(batch['input'].to(device), batch['target'].to(device), batch['length'])
     if model.training:
       elbo.backward()
       optimizer.step()
@@ -45,7 +45,7 @@ def run_epoch(model, datasets, device, optimizer):
 
   # Optionally, run a validation epoch
   val_elbo = None
-  if datasets['val']:
+  if datasets.get('val'):
     model.eval()
     with torch.no_grad():
       val_elbo = epoch_iter(model, datasets, device, optimizer, 'val')
@@ -59,7 +59,7 @@ def main(ARGS, device):
   testing. Then, initializes the VAE model and runs the training (/validation)
   process for a given number of epochs.
   """
-  data_splits = ['train']
+  data_splits = ['train', 'val']
   datasets = {
     split: IMDB(ARGS.data_dir, split, ARGS.max_sequence_length, ARGS.min_word_occ)
       for split in data_splits
