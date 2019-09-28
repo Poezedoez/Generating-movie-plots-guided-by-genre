@@ -5,7 +5,7 @@ import torch
 import numpy as np
 import pandas as pd
 from torch.utils.data import Dataset
-from nltk.tokenize import TweetTokenizer
+from nltk.tokenize import TweetTokenizer, PunktSentenceTokenizer
 from collections import defaultdict, Counter, OrderedDict
 
 
@@ -21,7 +21,9 @@ class OrderedCounter(Counter, OrderedDict):
 
 
 class IMDB(Dataset):
-    def __init__(self, data_dir, split, max_sequence_length, min_word_occ):
+    def __init__(self, data_dir, split, max_sequence_length, min_word_occ,
+            create_data=False):
+
         super().__init__()
 
         assert split in ['train', 'val', 'test'], 'Split can only be train/val/test'
@@ -40,7 +42,9 @@ class IMDB(Dataset):
         if not os.path.exists(os.path.join(self.data_dir, 'imdb.train.csv')):
             self.split_data()
 
-        if not os.path.exists(os.path.join(self.data_dir, self.data_file)):
+        if create_data:
+            self.create_data()
+        elif not os.path.exists(os.path.join(self.data_dir, self.data_file)):
             print('Preprocessed {} file not found at path {}, creating new...'.format(
                 split, os.path.join(self.data_dir, self.data_file)
             ))
@@ -121,32 +125,40 @@ class IMDB(Dataset):
         else:
             self._load_vocab()
 
+        print(f'Creating data for {self.split} split...')
         tokenizer = TweetTokenizer(preserve_case=False)
+        sent_tokenizer = PunktSentenceTokenizer()
 
         data = defaultdict(dict)
         df = pd.read_csv(self.raw_data_path)
         for _, row in df.iterrows():
-            words = tokenizer.tokenize(row['plot'])
+            tokens = tokenizer.tokenize(row['plot'])
+            # Split the plot into separate sentences
+            sentences = sent_tokenizer.sentences_from_tokens(tokens)
+            # Generate a sample from each sentence
+            for words in sentences:
+                input = ['<sos>'] + words
+                input = input[:self.max_sequence_length]
 
-            input = ['<sos>'] + words
-            input = input[:self.max_sequence_length]
+                if len(words) > self.max_sequence_length:
+                    continue
 
-            target = words[:self.max_sequence_length-1]
-            target = target + ['<eos>']
+                target = words[:self.max_sequence_length-1]
+                target = target + ['<eos>']
 
-            assert len(input) == len(target), "%i, %i"%(len(input), len(target))
-            length = len(input)
+                assert len(input) == len(target), "%i, %i"%(len(input), len(target))
+                length = len(input)
 
-            input.extend(['<pad>'] * (self.max_sequence_length-length))
-            target.extend(['<pad>'] * (self.max_sequence_length-length))
+                input.extend(['<pad>'] * (self.max_sequence_length-length))
+                target.extend(['<pad>'] * (self.max_sequence_length-length))
 
-            input = [self.w2i.get(w, self.w2i['<unk>']) for w in input]
-            target = [self.w2i.get(w, self.w2i['<unk>']) for w in target]
+                input = [self.w2i.get(w, self.w2i['<unk>']) for w in input]
+                target = [self.w2i.get(w, self.w2i['<unk>']) for w in target]
 
-            id = len(data)
-            data[id]['input'] = input
-            data[id]['target'] = target
-            data[id]['length'] = length
+                id = len(data)
+                data[id]['input'] = input
+                data[id]['target'] = target
+                data[id]['length'] = length
 
         with io.open(os.path.join(self.data_dir, self.data_file), 'wb') as data_file:
             data = json.dumps(data, ensure_ascii=False)
@@ -156,7 +168,7 @@ class IMDB(Dataset):
 
     def _create_vocab(self):
         assert self.split == 'train', "Vocabulary can only be created for training file."
-
+        print('Creating vocabulary...')
         tokenizer = TweetTokenizer(preserve_case=False)
 
         w2c = OrderedCounter()

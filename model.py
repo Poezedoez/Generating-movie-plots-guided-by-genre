@@ -56,9 +56,10 @@ class Decoder(nn.Module):
 class VAE(nn.Module):
   def __init__(
       self, vocab_size, batch_size, device,
+      trainset,
       lstm_dim=100, z_dim=100, emb_dim=100,
       kl_anneal_type=None, kl_anneal_x0=None, kl_anneal_k=None,
-      word_keep_rate=0,
+      word_keep_rate=0.5,
   ):
 
     super(VAE, self).__init__()
@@ -73,11 +74,13 @@ class VAE(nn.Module):
 
     self.word_keep_rate = word_keep_rate
 
+    self.trainset = trainset
+
     self.embedding = nn.Embedding(vocab_size, emb_dim).to(device)
     self.encoder = Encoder(vocab_size, lstm_dim, z_dim, emb_dim)
     self.decoder = Decoder(vocab_size, batch_size, lstm_dim, z_dim, emb_dim)
-    # 0 = padding index
-    self.NLL = nn.NLLLoss(size_average=False, ignore_index=0)
+    # Ignore the padding when calculating the differences
+    self.NLL = nn.NLLLoss(size_average=False, ignore_index=self.trainset.pad_idx)
     self.latent_size = z_dim
 
   def forward(self, input_seq, target_seq, lengths):
@@ -99,9 +102,16 @@ class VAE(nn.Module):
     # Drop words from the sequence on which the encoder model is conditioned by
     # setting them to UNK tokens. Only drop a fraction of words given by
     # the drop keep rate.
-    if self.drop_keep_rate > 0:
-      # TODO: implemented word drop out
-    logp = self.decoder(input_seq_packed, z)
+    decoder_input_seq_packed = input_seq_packed
+    if self.word_keep_rate > 0:
+      prob = torch.rand(input_seq.size(), device=self.device)
+      prob[(input_seq.data - self.trainset.sos_idx) * (input_seq.data - self.trainset.pad_idx) == 0] = 1
+      decoder_input_seq = input_seq.clone()
+      decoder_input_seq[prob > self.word_keep_rate] = self.trainset.unk_idx
+      decoder_input_seq_embedded = self.embedding(decoder_input_seq)
+      decoder_input_seq_packed = rnn_utils.pack_padded_sequence(
+        decoder_input_seq_embedded, sorted_lengths.data.tolist(), batch_first=True)
+    logp = self.decoder(decoder_input_seq_packed, z)
     # Revert back the order of the input since we have previously
     # sorted the input in descending order based on their sequence length.
     # We need to set it back to the original order for when calculating
@@ -131,7 +141,7 @@ class VAE(nn.Module):
     kl_weight = self.kl_anneal_function()
 
     batch_size = target.size(0)
-    return (nll_loss + kl_loss) / batch_size
+    return (nll_loss + kl_loss * kl_weight) / batch_size
 
   def sample(self, p):
     return torch.distributions.Categorical(p).sample()

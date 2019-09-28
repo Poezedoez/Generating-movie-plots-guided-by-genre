@@ -60,13 +60,16 @@ def main(ARGS, device):
   """
   data_splits = ['train', 'val']
   datasets = {
-    split: IMDB(ARGS.data_dir, split, ARGS.max_sequence_length, ARGS.min_word_occ)
+    split: IMDB(ARGS.data_dir, split, ARGS.max_sequence_length, ARGS.min_word_occ,
+        ARGS.create_data)
       for split in data_splits
   }
   model = VAE(
     datasets['train'].vocab_size, ARGS.batch_size, device,
+    trainset=datasets['train'],
     kl_anneal_type=ARGS.kl_anneal_type, kl_anneal_x0=ARGS.kl_anneal_x0,
     kl_anneal_k=ARGS.kl_anneal_k,
+    word_keep_rate=ARGS.word_keep_rate,
   )
   model.to(device)
 
@@ -84,6 +87,8 @@ def main(ARGS, device):
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
+  parser.add_argument('--create_data', default=False, type=bool,
+                      help='whether to create new IMDB data files')
   parser.add_argument('--epochs', default=1, type=int,
                       help='max number of epochs')
   parser.add_argument('--batch_size', default=32, type=int,
@@ -100,6 +105,8 @@ if __name__ == "__main__":
   parser.add_argument('-kl_af', '--kl_anneal_type', type=str, default='logistic')
   parser.add_argument('-kl_k', '--kl_anneal_k', type=float, default=0.0025)
   parser.add_argument('-kl_x0', '--kl_anneal_x0', type=int, default=2500)
+
+  parser.add_argument('-wkr', '--word_keep_rate', type=float, default=0.5)
 
   ARGS = parser.parse_args()
   device = torch.device(ARGS.device)
