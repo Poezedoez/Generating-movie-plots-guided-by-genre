@@ -39,7 +39,7 @@ class Decoder(nn.Module):
     self.lstm_to_vocab = nn.Linear(lstm_dim, vocab_size)
     self.batch_size = batch_size
     self.lstm_dim = lstm_dim
-    
+
   def forward(self, embedded, z):
     initial_hidden = self.z_to_hidden(z)
     initial_cell = self.z_to_cell(z)
@@ -57,7 +57,8 @@ class VAE(nn.Module):
   def __init__(
       self, vocab_size, batch_size, device,
       lstm_dim=100, z_dim=100, emb_dim=100,
-      kl_anneal_type=None, kl_anneal_x0=None, kl_anneal_k=None
+      kl_anneal_type=None, kl_anneal_x0=None, kl_anneal_k=None,
+      word_keep_rate=0,
   ):
 
     super(VAE, self).__init__()
@@ -69,6 +70,8 @@ class VAE(nn.Module):
     self.kl_anneal_type = kl_anneal_type
     self.kl_anneal_x0 = kl_anneal_x0
     self.kl_anneal_k = kl_anneal_k
+
+    self.word_keep_rate = word_keep_rate
 
     self.embedding = nn.Embedding(vocab_size, emb_dim).to(device)
     self.encoder = Encoder(vocab_size, lstm_dim, z_dim, emb_dim)
@@ -92,6 +95,11 @@ class VAE(nn.Module):
     mean, logvar = self.encoder(input_seq_packed)
     z = self.reparameterize(mean, logvar)
     # NOTE: use input_seq_packed OR ((maybe add dropout and) + embedding dropout -> pack sequence)
+    # Drop words from the sequence on which the encoder model is conditioned by
+    # setting them to UNK tokens. Only drop a fraction of words given by
+    # the drop keep rate.
+    if self.drop_keep_rate > 0:
+      # TODO: implemented word drop out
     logp = self.decoder(input_seq_packed, z)
     # Revert back the order of the input since we have previously
     # sorted the input in descending order based on their sequence length.
