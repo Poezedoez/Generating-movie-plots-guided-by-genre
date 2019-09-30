@@ -2,6 +2,7 @@ import argparse
 import torch
 from multiprocessing import cpu_count
 from torch.utils.data import DataLoader
+import os
 
 from imdb import IMDB
 from model import VAE
@@ -22,6 +23,9 @@ def epoch_iter(model, datasets, device, optimizer, data_type):
     pin_memory=torch.cuda.is_available()
   )
   elbo_loss = 0
+
+  amount_of_files = len(os.listdir("trained_models"))
+
   for i, batch in enumerate(data_loader):
     if model.training:
       optimizer.zero_grad()
@@ -31,6 +35,7 @@ def epoch_iter(model, datasets, device, optimizer, data_type):
       optimizer.step()
       model.kl_anneal_step()
     elbo_loss += elbo.item()
+    model.save(f"trained_models/{amount_of_files + 1}.model")
   return elbo_loss / (i+1)
 
 

@@ -3,7 +3,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.utils.rnn as rnn_utils
-
+import os
+import pickle
 
 class Encoder(nn.Module):
   def __init__(self, vocab_size, lstm_dim=100, z_dim=100, emb_dim=100):
@@ -142,6 +143,15 @@ class VAE(nn.Module):
 
     batch_size = target.size(0)
     return (nll_loss + kl_loss * kl_weight) / batch_size
+
+  @staticmethod
+  def load(path):
+    with open(path, 'rb') as f:
+      return pickle.load(f)
+
+  def save(self, path):
+    with open(path, 'wb') as f:
+      pickle.dump(self, f)
 
   def sample(self, p):
     return torch.distributions.Categorical(p).sample()
