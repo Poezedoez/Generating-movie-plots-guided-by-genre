@@ -140,13 +140,12 @@ class IMDB(Dataset):
                 randn = np.random.uniform()
                 # Only save 30 percent of the sentences in our dataset
                 # due to performance limitations
-                if randn > 0.3:
-                    continue
-                input = ['<sos>'] + words
-
                 # if sentence longer than max sequence length don't use it
-                if len(words) > self.max_sequence_length:
+                if randn > 0.3 or len(words) > self.max_sequence_length-1:
                     continue
+
+                input = ['<sos>'] + words
+                input = input[:self.max_sequence_length]
 
                 target = words[:self.max_sequence_length-1]
                 target = target + ['<eos>']
