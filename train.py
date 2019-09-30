@@ -72,6 +72,7 @@ def main(ARGS, device):
   model = VAE(
     datasets['train'].vocab_size, ARGS.batch_size, device,
     trainset=datasets['train'],
+    max_sequence_length=ARGS.max_sequence_length,
     kl_anneal_type=ARGS.kl_anneal_type, kl_anneal_x0=ARGS.kl_anneal_x0,
     kl_anneal_k=ARGS.kl_anneal_k,
     kl_fbits_lambda=ARGS.kl_fbits_lambda,
@@ -88,31 +89,44 @@ def main(ARGS, device):
     elbos = run_epoch(model, datasets, device, optimizer)
     train_elbo, val_elbo = elbos
     print(f"[Epoch {epoch} train elbo: {train_elbo}, val_elbo: {val_elbo}]")
-    for _ in range(5):
-      infered = model.inference(datasets['train'])
-      print(f"\n [Infered sentence: {infered} \n")
+
+    # Perform inference on the trained model
+    with torch.no_grad():
+      model.eval()
+      samples = model.inference()
+      print(*idx2word(samples, i2w=datasets['train'].i2w, pad_idx=datasets['train'].pad_idx), sep='\n')
 
     model.save(f"trained_models/{amount_of_files + 1}.model")
 
+
+def idx2word(idx, i2w, pad_idx):
+  sent_str = [str()]*len(idx)
+  for i, sent in enumerate(idx):
+    for word_id in sent:
+      if word_id == pad_idx:
+        break
+      sent_str[i] += i2w[str(word_id.item())] + " "
+    sent_str[i] = sent_str[i].strip()
+  return sent_str
 
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('--create_data', default=False, type=bool,
                       help='whether to create new IMDB data files')
-  parser.add_argument('--epochs', default=1, type=int,
+  parser.add_argument('--epochs', default=10, type=int,
                       help='max number of epochs')
-  parser.add_argument('--batch_size', default=32, type=int,
+  parser.add_argument('--batch_size', default=4, type=int,
                       help='batch size')
   parser.add_argument('--device', default='cpu', type=str,
                       help='device')
   parser.add_argument('--data_dir', default='data', type=str,
                       help='directory where the movies genre data is stored')
-  parser.add_argument('--max_sequence_length', default=100, type=int,
+  parser.add_argument('--max_sequence_length', default=60, type=int,
                       help='max allowed length of the sequence')
   parser.add_argument('--min_word_occ', default='3', type=int,
                       help='only add word to vocabulary if occurence higher than this value')
-  parser.add_argument('--max_batches_per_epoch', default=3, type=int,
+  parser.add_argument('--max_batches_per_epoch', default=10, type=int,
                       help='only run one epoch for this number of batches')
   
   parser.add_argument('-kl_at', '--kl_anneal_type', type=str, default='logistic')

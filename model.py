@@ -57,7 +57,7 @@ class Decoder(nn.Module):
 class VAE(nn.Module):
   def __init__(
       self, vocab_size, batch_size, device,
-      trainset,
+      trainset, max_sequence_length,
       lstm_dim=100, z_dim=100, emb_dim=100,
       kl_anneal_type=None, kl_anneal_x0=None, kl_anneal_k=None,
       kl_fbits_lambda=None,
@@ -65,6 +65,8 @@ class VAE(nn.Module):
   ):
 
     super(VAE, self).__init__()
+
+    self.tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.Tensor
 
     self.batch_size = batch_size
     self.device = device
@@ -79,6 +81,7 @@ class VAE(nn.Module):
     self.word_keep_rate = word_keep_rate
 
     self.trainset = trainset
+    self.max_sequence_length = max_sequence_length
 
     self.embedding = nn.Embedding(vocab_size, emb_dim).to(device)
     self.encoder = Encoder(vocab_size, lstm_dim, z_dim, emb_dim)
@@ -169,30 +172,105 @@ class VAE(nn.Module):
       for idx in sequence 
       if idx != imdb.unk_idx and idx != imdb.sos_idx and idx != imdb.eos_idx]) + "."
 
-  def inference(self, imdb, max_seq_len=100, z=None):
+  # def inference(self, imdb, max_seq_len=100, z=None):
         
-    if z is None:
-      z = torch.randn((1, self.latent_size), device=self.device)
+  #   if z is None:
+  #     z = torch.randn((1, self.latent_size), device=self.device)
     
-    hidden = self.decoder.z_to_hidden(z).unsqueeze(1)
-    cell = self.decoder.z_to_cell(z).unsqueeze(1)
+  #   print('inference', self.decoder.z_to_hidden(z).size())
+  #   hidden = self.decoder.z_to_hidden(z).unsqueeze(1)
+  #   print('hidden unsqueezed', hidden.size())
+  #   cell = self.decoder.z_to_cell(z).unsqueeze(1)
 
-    # initialize sequence
-    sequence = [imdb.sos_idx] + [imdb.unk_idx for _ in range(max_seq_len - 1)] 
+  #   # initialize sequence
+  #   sequence = [imdb.sos_idx] + [imdb.unk_idx for _ in range(max_seq_len - 1)] 
 
-    for i in range(1, max_seq_len):
-      emb = self.embedding(torch.LongTensor(sequence).to(self.device)).unsqueeze(0)
+  #   for i in range(1, max_seq_len):
+  #     emb = self.embedding(torch.LongTensor(sequence).to(self.device)).unsqueeze(0)
 
-      decoded, hidden_cell = self.decoder.lstm(emb, (hidden, cell))
-      hidden, cell = hidden_cell
-      logp = F.softmax(self.decoder.lstm_to_vocab(decoded), dim=-1)
-      predicted = self.sample(logp[:, i]).item()
-      sequence[i] = predicted
-      if predicted == imdb.eos_idx:
-        return self.sentence_mapping(imdb, sequence)
+  #     decoded, hidden_cell = self.decoder.lstm(emb, (hidden, cell))
+  #     hidden, cell = hidden_cell
+  #     logp = F.softmax(self.decoder.lstm_to_vocab(decoded), dim=-1)
+  #     predicted = self.sample(logp[:, i]).item()
+  #     sequence[i] = predicted
+  #     if predicted == imdb.eos_idx:
+  #       return self.sentence_mapping(imdb, sequence)
 
-    return self.sentence_mapping(imdb, sequence)
+  #   return self.sentence_mapping(imdb, sequence)
   
+  def inference(self, n=4, z=None):
+    if z is None:
+      batch_size = n
+      z = torch.randn((batch_size, self.latent_size), device=self.device)
+    else:
+      batch_size = z.size(0)
+    
+    hidden = self.decoder.z_to_hidden(z).unsqueeze(0)
+    cell = self.decoder.z_to_cell(z).unsqueeze(0)
+
+    # required for dynamic stopping of sentence generation
+    sequence_idx = torch.arange(0, batch_size, out=self.tensor()).long() # all idx of batch
+    sequence_running = torch.arange(0, batch_size, out=self.tensor()).long() # all idx of batch which are still generating
+    sequence_mask = torch.ones(batch_size, out=self.tensor()).byte()
+
+    running_seqs = torch.arange(0, batch_size, out=self.tensor()).long() # idx of still generating sequences with respect to current loop
+
+    generations = self.tensor(batch_size, self.max_sequence_length).fill_(self.trainset.pad_idx).long()
+
+    t = 0
+    while (t<self.max_sequence_length and len(running_seqs)>0):
+      if t == 0:
+          input_sequence = torch.Tensor(batch_size).fill_(self.trainset.sos_idx).long()
+
+      input_sequence = input_sequence.unsqueeze(1)
+
+      input_embedded = self.embedding(input_sequence)
+
+      decoded, _ = self.decoder.lstm(input_embedded, (hidden, cell))
+
+      logits = self.decoder.lstm_to_vocab(decoded)
+
+      input_sequence = self._sample(logits)
+
+      # save next input
+      generations = self._save_sample(generations, input_sequence, sequence_running, t)
+
+      # update gloabl running sequence
+      sequence_mask[sequence_running] = (input_sequence != self.trainset.eos_idx).data
+      sequence_running = sequence_idx.masked_select(sequence_mask)
+
+      # update local running sequences
+      running_mask = (input_sequence != self.trainset.eos_idx).data
+      running_seqs = running_seqs.masked_select(running_mask)
+
+      # prune input and hidden state according to local update
+      if len(running_seqs) > 0:
+        input_sequence = input_sequence[running_seqs]
+        hidden = hidden[:, running_seqs]
+        cell = cell[:, running_seqs]
+
+        running_seqs = torch.arange(0, len(running_seqs), out=self.tensor()).long()
+
+      t += 1
+    
+    return generations
+
+  def _sample(self, dist, mode='greedy'):
+    if mode == 'greedy':
+      _, sample = torch.topk(dist, 1, dim=-1)
+    sample = sample.squeeze()
+    return sample
+
+  def _save_sample(self, save_to, sample, running_seqs, t):
+    # select only still running
+    running_latest = save_to[running_seqs]
+    # update token at position t
+    running_latest[:,t] = sample.data
+    # save back
+    save_to[running_seqs] = running_latest
+
+    return save_to
+
   def kl_anneal_step(self):
     self.step += 1
   
