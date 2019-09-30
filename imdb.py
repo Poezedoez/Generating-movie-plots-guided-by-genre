@@ -137,6 +137,11 @@ class IMDB(Dataset):
             sentences = sent_tokenizer.sentences_from_tokens(tokens)
             # Generate a sample from each sentence
             for words in sentences:
+                randn = np.random.uniform()
+                # Only save 30 percent of the sentences in our dataset
+                # due to performance limitations
+                if randn > 0.3:
+                    continue
                 input = ['<sos>'] + words
 
                 # if sentence longer than max sequence length don't use it
