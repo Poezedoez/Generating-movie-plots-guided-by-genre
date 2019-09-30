@@ -30,7 +30,7 @@ def epoch_iter(model, datasets, device, optimizer, data_type):
 
     if model.training:
       optimizer.zero_grad()
-    elbo = model(batch['input'].to(device), batch['target'].to(device), batch['length'].to(device))
+    elbo = model(batch['input'], batch['target'], batch['length'])
     if model.training:
       elbo.backward()
       optimizer.step()
