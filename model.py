@@ -226,7 +226,7 @@ class VAE(nn.Module):
 
       input_embedded = self.embedding(input_sequence)
 
-      decoded, _ = self.decoder.lstm(input_embedded, (hidden, cell))
+      decoded, (hidden, cell) = self.decoder.lstm(input_embedded, (hidden, cell))
 
       logits = self.decoder.lstm_to_vocab(decoded)
 
@@ -258,7 +258,7 @@ class VAE(nn.Module):
   def _sample(self, dist, mode='greedy'):
     if mode == 'greedy':
       _, sample = torch.topk(dist, 1, dim=-1)
-    sample = sample.squeeze()
+    sample = sample.flatten()
     return sample
 
   def _save_sample(self, save_to, sample, running_seqs, t):

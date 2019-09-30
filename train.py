@@ -114,9 +114,9 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('--create_data', default=False, type=bool,
                       help='whether to create new IMDB data files')
-  parser.add_argument('--epochs', default=10, type=int,
+  parser.add_argument('--epochs', default=30, type=int,
                       help='max number of epochs')
-  parser.add_argument('--batch_size', default=16, type=int,
+  parser.add_argument('--batch_size', default=4, type=int,
                       help='batch size')
   parser.add_argument('--device', default='cpu', type=str,
                       help='device')
@@ -126,16 +126,16 @@ if __name__ == "__main__":
                       help='max allowed length of the sequence')
   parser.add_argument('--min_word_occ', default='3', type=int,
                       help='only add word to vocabulary if occurence higher than this value')
-  parser.add_argument('--max_batches_per_epoch', default=20, type=int,
+  parser.add_argument('--max_batches_per_epoch', default=100, type=int,
                       help='only run one epoch for this number of batches')
   
-  parser.add_argument('-kl_at', '--kl_anneal_type', type=str, default='logistic')
+  parser.add_argument('-kl_at', '--kl_anneal_type', type=str, default='linear')
   parser.add_argument('-kl_k', '--kl_anneal_k', type=float, default=0.0025)
-  parser.add_argument('-kl_x0', '--kl_anneal_x0', type=int, default=2500)
+  parser.add_argument('-kl_x0', '--kl_anneal_x0', type=int, default=5000)
 
   parser.add_argument('-kl_l', '--kl_fbits_lambda', type=float, default=5.0)
 
-  parser.add_argument('-wkr', '--word_keep_rate', type=float, default=0.5)
+  parser.add_argument('-wkr', '--word_keep_rate', type=float, default=0.8)
 
   ARGS = parser.parse_args()
   device = torch.device(ARGS.device)
