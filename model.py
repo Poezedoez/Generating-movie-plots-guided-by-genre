@@ -18,8 +18,8 @@ class Encoder(nn.Module):
     hidden, ht_ct = self.lstm(embedded)
     ht, ct = ht_ct
     mu = self.lstm_to_mu(ht)
-    std = self.lstm_to_sigma(ht)
-    return mu, std
+    logvar = self.lstm_to_sigma(ht)
+    return mu, logvar
 
 
 class Decoder(nn.Module):
@@ -59,6 +59,7 @@ class VAE(nn.Module):
       trainset,
       lstm_dim=100, z_dim=100, emb_dim=100,
       kl_anneal_type=None, kl_anneal_x0=None, kl_anneal_k=None,
+      kl_fbits_lambda=None,
       word_keep_rate=0.5,
   ):
 
@@ -71,6 +72,8 @@ class VAE(nn.Module):
     self.kl_anneal_type = kl_anneal_type
     self.kl_anneal_x0 = kl_anneal_x0
     self.kl_anneal_k = kl_anneal_k
+
+    self.kl_fbits_lambda = kl_fbits_lambda
 
     self.word_keep_rate = word_keep_rate
 
@@ -137,7 +140,12 @@ class VAE(nn.Module):
     nll_loss = self.NLL(logp, target)
 
     # KL Divergence
-    kl_loss = -0.5 * torch.sum(1 + logvar - mean.pow(2) - logvar.exp())
+    kl_div = torch.sum(1 + logvar - mean.pow(2) - logvar.exp(), dim=-1)
+    # KL free bits
+    if self.kl_fbits_lambda is not None:
+      kl_div[kl_div < self.kl_fbits_lambda] = self.kl_fbits_lambda
+    kl_loss = -0.5 * torch.sum(kl_div)
+    # KL annealing
     kl_weight = self.kl_anneal_function()
 
     batch_size = target.size(0)
