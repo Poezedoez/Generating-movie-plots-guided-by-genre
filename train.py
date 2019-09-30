@@ -116,7 +116,7 @@ if __name__ == "__main__":
                       help='whether to create new IMDB data files')
   parser.add_argument('--epochs', default=10, type=int,
                       help='max number of epochs')
-  parser.add_argument('--batch_size', default=4, type=int,
+  parser.add_argument('--batch_size', default=16, type=int,
                       help='batch size')
   parser.add_argument('--device', default='cpu', type=str,
                       help='device')
@@ -126,7 +126,7 @@ if __name__ == "__main__":
                       help='max allowed length of the sequence')
   parser.add_argument('--min_word_occ', default='3', type=int,
                       help='only add word to vocabulary if occurence higher than this value')
-  parser.add_argument('--max_batches_per_epoch', default=10, type=int,
+  parser.add_argument('--max_batches_per_epoch', default=20, type=int,
                       help='only run one epoch for this number of batches')
   
   parser.add_argument('-kl_at', '--kl_anneal_type', type=str, default='logistic')
