@@ -23,6 +23,9 @@ def epoch_iter(model, datasets, device, optimizer, data_type):
   )
   elbo_loss = 0
   for i, batch in enumerate(data_loader):
+    if i > ARGS.max_batches_per_epoch:
+      break
+
     if model.training:
       optimizer.zero_grad()
     elbo = model(batch['input'].to(device), batch['target'].to(device), batch['length'])
@@ -75,6 +78,8 @@ def main(ARGS, device):
 
   optimizer = torch.optim.Adam(model.parameters())
 
+  print('Starting training process...')
+
   for epoch in range(ARGS.epochs):
     elbos = run_epoch(model, datasets, device, optimizer)
     train_elbo, val_elbo = elbos
@@ -89,7 +94,7 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('--create_data', default=False, type=bool,
                       help='whether to create new IMDB data files')
-  parser.add_argument('--epochs', default=1, type=int,
+  parser.add_argument('--epochs', default=20, type=int,
                       help='max number of epochs')
   parser.add_argument('--batch_size', default=32, type=int,
                       help='batch size')
@@ -101,6 +106,8 @@ if __name__ == "__main__":
                       help='max allowed length of the sequence')
   parser.add_argument('--min_word_occ', default='3', type=int,
                       help='only add word to vocabulary if occurence higher than this value')
+  parser.add_argument('--max_batches_per_epoch', default='100', type=int,
+                      help='only run one epoch for this number of batches')
   
   parser.add_argument('-kl_af', '--kl_anneal_type', type=str, default='logistic')
   parser.add_argument('-kl_k', '--kl_anneal_k', type=float, default=0.0025)
