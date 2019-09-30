@@ -129,9 +129,9 @@ if __name__ == "__main__":
   parser.add_argument('--max_batches_per_epoch', default=100, type=int,
                       help='only run one epoch for this number of batches')
   
-  parser.add_argument('-kl_at', '--kl_anneal_type', type=str, default='linear')
+  parser.add_argument('-kl_at', '--kl_anneal_type', type=str, default='logistic')
   parser.add_argument('-kl_k', '--kl_anneal_k', type=float, default=0.0025)
-  parser.add_argument('-kl_x0', '--kl_anneal_x0', type=int, default=5000)
+  parser.add_argument('-kl_x0', '--kl_anneal_x0', type=int, default=4500)
 
   parser.add_argument('-kl_l', '--kl_fbits_lambda', type=float, default=5.0)
 
