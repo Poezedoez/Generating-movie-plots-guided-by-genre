@@ -108,7 +108,7 @@ if __name__ == "__main__":
                       help='device')
   parser.add_argument('--data_dir', default='data', type=str,
                       help='directory where the movies genre data is stored')
-  parser.add_argument('--max_sequence_length', default='100', type=int,
+  parser.add_argument('--max_sequence_length', default=100, type=int,
                       help='max allowed length of the sequence')
   parser.add_argument('--min_word_occ', default='3', type=int,
                       help='only add word to vocabulary if occurence higher than this value')
