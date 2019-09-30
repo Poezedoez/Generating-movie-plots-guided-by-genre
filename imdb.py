@@ -107,15 +107,15 @@ class IMDB(Dataset):
         test.to_csv(os.path.join(self.data_dir, 'imdb.test.csv'))
 
     def _load_data(self, vocab=True):
-        with open(os.path.join(self.data_dir, self.data_file), 'r') as file:
+        with open(os.path.join(self.data_dir, self.data_file), 'r', encoding='utf-8') as file:
             self.data = json.load(file)
         if vocab:
-            with open(os.path.join(self.data_dir, self.vocab_file), 'r') as file:
+            with open(os.path.join(self.data_dir, self.vocab_file), 'r', encoding='utf-8') as file:
                 vocab = json.load(file)
             self.w2i, self.i2w = vocab['w2i'], vocab['i2w']
 
     def _load_vocab(self):
-        with open(os.path.join(self.data_dir, self.vocab_file), 'r') as vocab_file:
+        with open(os.path.join(self.data_dir, self.vocab_file), 'r', encoding='utf-8') as vocab_file:
             vocab = json.load(vocab_file)
         self.w2i, self.i2w = vocab['w2i'], vocab['i2w']
 
@@ -138,8 +138,8 @@ class IMDB(Dataset):
             # Generate a sample from each sentence
             for words in sentences:
                 input = ['<sos>'] + words
-                input = input[:self.max_sequence_length]
 
+                # if sentence longer than max sequence length don't use it
                 if len(words) > self.max_sequence_length:
                     continue
 

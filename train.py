@@ -2,6 +2,7 @@ import argparse
 import torch
 from multiprocessing import cpu_count
 from torch.utils.data import DataLoader
+import os
 
 from imdb import IMDB
 from model import VAE
@@ -22,6 +23,7 @@ def epoch_iter(model, datasets, device, optimizer, data_type):
     pin_memory=torch.cuda.is_available()
   )
   elbo_loss = 0
+
   for i, batch in enumerate(data_loader):
     if i > ARGS.max_batches_per_epoch:
       break
@@ -81,6 +83,7 @@ def main(ARGS, device):
 
   print('Starting training process...')
 
+  amount_of_files = len(os.listdir("trained_models"))
   for epoch in range(ARGS.epochs):
     elbos = run_epoch(model, datasets, device, optimizer)
     train_elbo, val_elbo = elbos
@@ -88,6 +91,8 @@ def main(ARGS, device):
     for _ in range(5):
       infered = model.inference(datasets['train'])
       print(f"\n [Infered sentence: {infered} \n")
+
+    model.save(f"trained_models/{amount_of_files + 1}.model")
 
 
 
