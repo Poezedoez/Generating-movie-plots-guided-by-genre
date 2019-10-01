@@ -7,7 +7,7 @@ import os
 import pickle
 
 class Encoder(nn.Module):
-  def __init__(self, vocab_size, lstm_dim, z_dim, embe_dim):
+  def __init__(self, vocab_size, lstm_dim, z_dim, embed_dim):
     super(Encoder, self).__init__()
 
     self.lstm = nn.LSTM(embed_dim, lstm_dim, num_layers=1, batch_first=True)
@@ -57,6 +57,7 @@ class Decoder(nn.Module):
 class VAE(nn.Module):
   def __init__(
       self, vocab_size, batch_size, device,
+      pretrained_embeddings,
       trainset, max_sequence_length,
       lstm_dim, z_dim, embed_dim,
       kl_anneal_type=None, kl_anneal_x0=None, kl_anneal_k=None,
@@ -83,7 +84,8 @@ class VAE(nn.Module):
     self.trainset = trainset
     self.max_sequence_length = max_sequence_length
 
-    self.embedding = nn.Embedding(vocab_size, embed_dim).to(device)
+    # self.embedding = nn.Embedding(vocab_size, embed_dim).to(device)
+    self.embedding = nn.Embedding.from_pretrained(pretrained_embeddings).to(device)
     self.encoder = Encoder(vocab_size, lstm_dim, z_dim, embed_dim)
     self.decoder = Decoder(vocab_size, batch_size, lstm_dim, z_dim, embed_dim)
     # Ignore the padding when calculating the differences
