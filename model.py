@@ -7,10 +7,10 @@ import os
 import pickle
 
 class Encoder(nn.Module):
-  def __init__(self, vocab_size, lstm_dim=100, z_dim=100, emb_dim=100):
+  def __init__(self, vocab_size, lstm_dim, z_dim, embe_dim):
     super(Encoder, self).__init__()
 
-    self.lstm = nn.LSTM(emb_dim, lstm_dim, num_layers=1, batch_first=True)
+    self.lstm = nn.LSTM(embed_dim, lstm_dim, num_layers=1, batch_first=True)
     self.lstm_to_mu = nn.Linear(lstm_dim, z_dim)
     self.lstm_to_sigma = nn.Linear(lstm_dim, z_dim)
 
@@ -27,14 +27,14 @@ class Decoder(nn.Module):
   def __init__(self,
     vocab_size,
     batch_size,
-    lstm_dim=100,
-    z_dim=100,
-    emb_dim=100,
+    lstm_dim,
+    z_dim,
+    embed_dim,
   ):
     super(Decoder, self).__init__()
 
-    self.emb_dim = emb_dim
-    self.lstm = nn.LSTM(emb_dim, lstm_dim, num_layers=1, batch_first=True)
+    self.embed_dim = embed_dim
+    self.lstm = nn.LSTM(embed_dim, lstm_dim, num_layers=1, batch_first=True)
     self.z_to_hidden = nn.Linear(z_dim, lstm_dim)
     self.z_to_cell = nn.Linear(z_dim, lstm_dim)
     self.lstm_to_vocab = nn.Linear(lstm_dim, vocab_size)
@@ -58,7 +58,7 @@ class VAE(nn.Module):
   def __init__(
       self, vocab_size, batch_size, device,
       trainset, max_sequence_length,
-      lstm_dim=100, z_dim=100, emb_dim=100,
+      lstm_dim, z_dim, embed_dim,
       kl_anneal_type=None, kl_anneal_x0=None, kl_anneal_k=None,
       kl_fbits_lambda=None,
       word_keep_rate=0.5,
@@ -83,9 +83,9 @@ class VAE(nn.Module):
     self.trainset = trainset
     self.max_sequence_length = max_sequence_length
 
-    self.embedding = nn.Embedding(vocab_size, emb_dim).to(device)
-    self.encoder = Encoder(vocab_size, lstm_dim, z_dim, emb_dim)
-    self.decoder = Decoder(vocab_size, batch_size, lstm_dim, z_dim, emb_dim)
+    self.embedding = nn.Embedding(vocab_size, embed_dim).to(device)
+    self.encoder = Encoder(vocab_size, lstm_dim, z_dim, embed_dim)
+    self.decoder = Decoder(vocab_size, batch_size, lstm_dim, z_dim, embed_dim)
     # Ignore the padding when calculating the differences
     self.NLL = nn.NLLLoss(size_average=False, ignore_index=self.trainset.pad_idx)
     self.latent_size = z_dim
@@ -258,6 +258,10 @@ class VAE(nn.Module):
   def _sample(self, dist, mode='greedy'):
     if mode == 'greedy':
       _, sample = torch.topk(dist, 1, dim=-1)
+    else:
+      print('sample dist', dist.size(), dist, F.softmax(dist, dim=-1))
+      sample = torch.multinomial(F.softmax(dist, dim=-1), 1)
+      print('output sample', sample.size(), sample)
     sample = sample.flatten()
     return sample
 
@@ -268,7 +272,6 @@ class VAE(nn.Module):
     running_latest[:,t] = sample.data
     # save back
     save_to[running_seqs] = running_latest
-
     return save_to
 
   def kl_anneal_step(self):
