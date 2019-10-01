@@ -7,10 +7,10 @@ import os
 import pickle
 
 class Encoder(nn.Module):
-  def __init__(self, vocab_size, lstm_dim, z_dim, embed_dim):
+  def __init__(self, vocab_size, lstm_dim, z_dim, embed_dim, n_lstm_layers):
     super(Encoder, self).__init__()
 
-    self.lstm = nn.LSTM(embed_dim, lstm_dim, num_layers=1, batch_first=True)
+    self.lstm = nn.LSTM(embed_dim, lstm_dim, num_layers=n_lstm_layers, batch_first=True)
     self.lstm_to_mu = nn.Linear(lstm_dim, z_dim)
     self.lstm_to_sigma = nn.Linear(lstm_dim, z_dim)
 
@@ -30,11 +30,12 @@ class Decoder(nn.Module):
     lstm_dim,
     z_dim,
     embed_dim,
+    n_lstm_layers,
   ):
     super(Decoder, self).__init__()
 
     self.embed_dim = embed_dim
-    self.lstm = nn.LSTM(embed_dim, lstm_dim, num_layers=1, batch_first=True)
+    self.lstm = nn.LSTM(embed_dim, lstm_dim, num_layers=n_lstm_layers, batch_first=True)
     self.z_to_hidden = nn.Linear(z_dim, lstm_dim)
     self.z_to_cell = nn.Linear(z_dim, lstm_dim)
     self.lstm_to_vocab = nn.Linear(lstm_dim, vocab_size)
@@ -59,7 +60,7 @@ class VAE(nn.Module):
       self, vocab_size, batch_size, device,
       pretrained_embeddings,
       trainset, max_sequence_length,
-      lstm_dim, z_dim, embed_dim,
+      lstm_dim, z_dim, embed_dim, n_lstm_layers,
       kl_anneal_type=None, kl_anneal_x0=None, kl_anneal_k=None,
       kl_fbits_lambda=None,
       word_keep_rate=0.5,
@@ -87,8 +88,8 @@ class VAE(nn.Module):
     # self.embedding = nn.Embedding(vocab_size, embed_dim).to(device)
     self.embedding = nn.Embedding.from_pretrained(
       pretrained_embeddings, freeze=False).to(device)
-    self.encoder = Encoder(vocab_size, lstm_dim, z_dim, embed_dim)
-    self.decoder = Decoder(vocab_size, batch_size, lstm_dim, z_dim, embed_dim)
+    self.encoder = Encoder(vocab_size, lstm_dim, z_dim, embed_dim, n_lstm_layers)
+    self.decoder = Decoder(vocab_size, batch_size, lstm_dim, z_dim, embed_dim, n_lstm_layers)
     # Ignore the padding when calculating the differences
     self.NLL = nn.NLLLoss(size_average=False, ignore_index=self.trainset.pad_idx)
     self.latent_size = z_dim
@@ -174,32 +175,6 @@ class VAE(nn.Module):
     return " ".join([imdb.i2w[str(idx)] 
       for idx in sequence 
       if idx != imdb.unk_idx and idx != imdb.sos_idx and idx != imdb.eos_idx]) + "."
-
-  # def inference(self, imdb, max_seq_len=100, z=None):
-        
-  #   if z is None:
-  #     z = torch.randn((1, self.latent_size), device=self.device)
-    
-  #   print('inference', self.decoder.z_to_hidden(z).size())
-  #   hidden = self.decoder.z_to_hidden(z).unsqueeze(1)
-  #   print('hidden unsqueezed', hidden.size())
-  #   cell = self.decoder.z_to_cell(z).unsqueeze(1)
-
-  #   # initialize sequence
-  #   sequence = [imdb.sos_idx] + [imdb.unk_idx for _ in range(max_seq_len - 1)] 
-
-  #   for i in range(1, max_seq_len):
-  #     emb = self.embedding(torch.LongTensor(sequence).to(self.device)).unsqueeze(0)
-
-  #     decoded, hidden_cell = self.decoder.lstm(emb, (hidden, cell))
-  #     hidden, cell = hidden_cell
-  #     logp = F.softmax(self.decoder.lstm_to_vocab(decoded), dim=-1)
-  #     predicted = self.sample(logp[:, i]).item()
-  #     sequence[i] = predicted
-  #     if predicted == imdb.eos_idx:
-  #       return self.sentence_mapping(imdb, sequence)
-
-  #   return self.sentence_mapping(imdb, sequence)
   
   def inference(self, n=4, z=None):
     if z is None:

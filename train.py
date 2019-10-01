@@ -85,6 +85,7 @@ def main(ARGS, device):
     trainset=datasets['train'],
     max_sequence_length=ARGS.max_sequence_length,
     lstm_dim=ARGS.lstm_dim, z_dim=ARGS.z_dim, embed_dim=ARGS.embed_dim,
+    n_lstm_layers=ARGS.n_lstm_layers,
     kl_anneal_type=ARGS.kl_anneal_type, kl_anneal_x0=ARGS.kl_anneal_x0,
     kl_anneal_k=ARGS.kl_anneal_k,
     kl_fbits_lambda=ARGS.kl_fbits_lambda,
@@ -145,6 +146,7 @@ if __name__ == "__main__":
   parser.add_argument('--embed_dim', type=int, default=300)
   parser.add_argument('--z_dim', type=int, default=16)
   parser.add_argument('--lstm_dim', type=int, default=256)
+  parser.add_argument('--n_lstm_layers', type=int, default=3)
   
   parser.add_argument('-kl_at', '--kl_anneal_type', type=str, default='logistic')
   parser.add_argument('-kl_k', '--kl_anneal_k', type=float, default=0.0025)
