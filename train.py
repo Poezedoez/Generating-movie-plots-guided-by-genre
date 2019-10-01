@@ -47,12 +47,18 @@ def run_epoch(model, datasets, device, optimizer):
   model.train()
   train_elbo = epoch_iter(model, datasets, device, optimizer, 'train')
 
+  if torch.cuda.is_available():
+    torch.cuda.empty_cache()
+
   # Optionally, run a validation epoch
   val_elbo = None
   if datasets.get('val'):
     model.eval()
     with torch.no_grad():
       val_elbo = epoch_iter(model, datasets, device, optimizer, 'val')
+  
+  if torch.cuda.is_available():
+    torch.cuda.empty_cache()
   
   return train_elbo, val_elbo
 
@@ -73,6 +79,7 @@ def main(ARGS, device):
     datasets['train'].vocab_size, ARGS.batch_size, device,
     trainset=datasets['train'],
     max_sequence_length=ARGS.max_sequence_length,
+    lstm_dim=ARGS.lstm_dim, z_dim=ARGS.z_dim, embed_dim=ARGS.emb_dim,
     kl_anneal_type=ARGS.kl_anneal_type, kl_anneal_x0=ARGS.kl_anneal_x0,
     kl_anneal_k=ARGS.kl_anneal_k,
     kl_fbits_lambda=ARGS.kl_fbits_lambda,
@@ -128,6 +135,10 @@ if __name__ == "__main__":
                       help='only add word to vocabulary if occurence higher than this value')
   parser.add_argument('--max_batches_per_epoch', default=100, type=int,
                       help='only run one epoch for this number of batches')
+
+  parser.add_argument('--emb_dim', type=int, default=300)
+  parser.add_argument('--z_dim', type=int, default=16)
+  parser.add_argument('--lst_dim', type=int, default=256)
   
   parser.add_argument('-kl_at', '--kl_anneal_type', type=str, default='logistic')
   parser.add_argument('-kl_k', '--kl_anneal_k', type=float, default=0.0025)
@@ -135,7 +146,7 @@ if __name__ == "__main__":
 
   parser.add_argument('-kl_l', '--kl_fbits_lambda', type=float, default=5.0)
 
-  parser.add_argument('-wkr', '--word_keep_rate', type=float, default=0.8)
+  parser.add_argument('-wkr', '--word_keep_rate', type=float, default=0.75)
 
   ARGS = parser.parse_args()
   device = torch.device(ARGS.device)

@@ -58,7 +58,7 @@ class VAE(nn.Module):
   def __init__(
       self, vocab_size, batch_size, device,
       trainset, max_sequence_length,
-      lstm_dim=100, z_dim=100, emb_dim=100,
+      lstm_dim, z_dim, emb_dim,
       kl_anneal_type=None, kl_anneal_x0=None, kl_anneal_k=None,
       kl_fbits_lambda=None,
       word_keep_rate=0.5,
@@ -258,6 +258,10 @@ class VAE(nn.Module):
   def _sample(self, dist, mode='greedy'):
     if mode == 'greedy':
       _, sample = torch.topk(dist, 1, dim=-1)
+    else:
+      print('sample dist', dist.size(), dist, F.softmax(dist, dim=-1))
+      sample = torch.multinomial(F.softmax(dist, dim=-1), 1)
+      print('output sample', sample.size(), sample)
     sample = sample.flatten()
     return sample
 
@@ -268,7 +272,6 @@ class VAE(nn.Module):
     running_latest[:,t] = sample.data
     # save back
     save_to[running_seqs] = running_latest
-
     return save_to
 
   def kl_anneal_step(self):

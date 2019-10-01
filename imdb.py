@@ -4,6 +4,7 @@ import json
 import torch
 import numpy as np
 import pandas as pd
+from langdetect import detect, DetectorFactory
 from torch.utils.data import Dataset
 from nltk.tokenize import TweetTokenizer, PunktSentenceTokenizer
 from collections import defaultdict, Counter, OrderedDict
@@ -129,9 +130,14 @@ class IMDB(Dataset):
         tokenizer = TweetTokenizer(preserve_case=False)
         sent_tokenizer = PunktSentenceTokenizer()
 
+        DetectorFactory.seed = 0
+
         data = defaultdict(dict)
         df = pd.read_csv(self.raw_data_path)
         for _, row in df.iterrows():
+            # Only keep English plot samples
+            if detect(row['plot']) != 'en':
+                continue
             tokens = tokenizer.tokenize(row['plot'])
             # Split the plot into separate sentences
             sentences = sent_tokenizer.sentences_from_tokens(tokens)
