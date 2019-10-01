@@ -79,7 +79,7 @@ def main(ARGS, device):
     datasets['train'].vocab_size, ARGS.batch_size, device,
     trainset=datasets['train'],
     max_sequence_length=ARGS.max_sequence_length,
-    lstm_dim=ARGS.lstm_dim, z_dim=ARGS.z_dim, embed_dim=ARGS.emb_dim,
+    lstm_dim=ARGS.lstm_dim, z_dim=ARGS.z_dim, embed_dim=ARGS.embed_dim,
     kl_anneal_type=ARGS.kl_anneal_type, kl_anneal_x0=ARGS.kl_anneal_x0,
     kl_anneal_k=ARGS.kl_anneal_k,
     kl_fbits_lambda=ARGS.kl_fbits_lambda,
@@ -136,7 +136,7 @@ if __name__ == "__main__":
   parser.add_argument('--max_batches_per_epoch', default=100, type=int,
                       help='only run one epoch for this number of batches')
 
-  parser.add_argument('--emb_dim', type=int, default=300)
+  parser.add_argument('--embed_dim', type=int, default=300)
   parser.add_argument('--z_dim', type=int, default=16)
   parser.add_argument('--lst_dim', type=int, default=256)
   
