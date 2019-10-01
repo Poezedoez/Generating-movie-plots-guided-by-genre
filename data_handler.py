@@ -7,6 +7,7 @@ import sys
 from collections import defaultdict
 from collections import Counter
 from nltk.tokenize import sent_tokenize
+from langdetect import detect
 
 END_OF_SENTENCE_TAG = '<EOS>'
 UNKNOWN_TAG = '<UNK>'
@@ -82,6 +83,7 @@ class DataHandler:
       for _, movie in df.iterrows()
       for sentence in sent_tokenize(movie['plot'])
       if len(sent_tokenize(sentence)) < self.max_sequence_length
+        and detect(sentence) == 'en'
     ]
 
   def create_feature_vector(self, sample):
