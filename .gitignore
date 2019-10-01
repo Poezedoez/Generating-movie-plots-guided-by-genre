@@ -3,3 +3,4 @@
 /repo/
 /data/
 *.model
+/glove.6B/
