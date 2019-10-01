@@ -3,6 +3,7 @@ import torch
 from multiprocessing import cpu_count
 from torch.utils.data import DataLoader
 import os
+import numpy as np
 
 from imdb import IMDB
 from model import VAE
@@ -19,8 +20,9 @@ def epoch_iter(model, datasets, device, optimizer, data_type):
     dataset=datasets[data_type],
     batch_size=ARGS.batch_size,
     shuffle=data_type=='train',
-    num_workers=cpu_count(),
-    pin_memory=torch.cuda.is_available()
+    # num_workers=cpu_count(),
+    num_workers=1,
+    # pin_memory=torch.cuda.is_available()
   )
   elbo_loss = 0
 
@@ -75,8 +77,11 @@ def main(ARGS, device):
         ARGS.create_data)
       for split in data_splits
   }
+  pretrained_embeddings = datasets['train'].get_pretrained_embeddings(
+    ARGS.embed_dim).to(device)
   model = VAE(
     datasets['train'].vocab_size, ARGS.batch_size, device,
+    pretrained_embeddings=pretrained_embeddings,
     trainset=datasets['train'],
     max_sequence_length=ARGS.max_sequence_length,
     lstm_dim=ARGS.lstm_dim, z_dim=ARGS.z_dim, embed_dim=ARGS.embed_dim,
@@ -121,6 +126,7 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('--create_data', default=False, type=bool,
                       help='whether to create new IMDB data files')
+
   parser.add_argument('--epochs', default=30, type=int,
                       help='max number of epochs')
   parser.add_argument('--batch_size', default=4, type=int,
@@ -138,7 +144,7 @@ if __name__ == "__main__":
 
   parser.add_argument('--embed_dim', type=int, default=300)
   parser.add_argument('--z_dim', type=int, default=16)
-  parser.add_argument('--lst_dim', type=int, default=256)
+  parser.add_argument('--lstm_dim', type=int, default=256)
   
   parser.add_argument('-kl_at', '--kl_anneal_type', type=str, default='logistic')
   parser.add_argument('-kl_k', '--kl_anneal_k', type=float, default=0.0025)

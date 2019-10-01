@@ -209,3 +209,25 @@ class IMDB(Dataset):
             vocab_file.write(data.encode('utf8', 'replace'))
 
         self._load_vocab()
+    
+    def get_pretrained_embeddings(
+        self, embed_dim, glove_path='./glove.6B/glove.6B.300d.txt',
+    ):
+        result_path = os.path.join(self.data_dir, 'imdb.glove_embeddings.pt')
+        if os.path.exists(result_path):
+            print('Loading pretrained word embeddings from file...')
+            return torch.load(result_path)
+        print('Preparing pretrained word embeddings from Glove file...')
+        # Prepare an embeddings matrix of size (vocab x embed_dim)
+        embed_matrix = torch.randn((self.vocab_size, embed_dim))
+        # Set each pretrained word embedding vector at the correct word index
+        with open(glove_path, 'rb') as f:
+            for l in f:
+                line = l.decode().split()
+                word = line[0]
+                word_embedding = torch.FloatTensor(np.array(line[1:]).astype(np.float))
+                if word in self.w2i:
+                    embed_matrix[self.w2i[word]] = word_embedding
+        torch.save(embed_matrix, result_path)
+        print('Saved word embeddings to file...')
+        return embed_matrix
