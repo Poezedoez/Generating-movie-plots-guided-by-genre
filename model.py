@@ -85,7 +85,8 @@ class VAE(nn.Module):
     self.max_sequence_length = max_sequence_length
 
     # self.embedding = nn.Embedding(vocab_size, embed_dim).to(device)
-    self.embedding = nn.Embedding.from_pretrained(pretrained_embeddings).to(device)
+    self.embedding = nn.Embedding.from_pretrained(
+      pretrained_embeddings, freeze=False).to(device)
     self.encoder = Encoder(vocab_size, lstm_dim, z_dim, embed_dim)
     self.decoder = Decoder(vocab_size, batch_size, lstm_dim, z_dim, embed_dim)
     # Ignore the padding when calculating the differences
@@ -257,13 +258,12 @@ class VAE(nn.Module):
     
     return generations
 
-  def _sample(self, dist, mode='greedy'):
-    if mode == 'greedy':
+  def _sample(self, dist, greedy_mode=False):
+    if greedy_mode:
       _, sample = torch.topk(dist, 1, dim=-1)
     else:
-      print('sample dist', dist.size(), dist, F.softmax(dist, dim=-1))
-      sample = torch.multinomial(F.softmax(dist, dim=-1), 1)
-      print('output sample', sample.size(), sample)
+      probs = F.softmax(dist, dim=-1)
+      sample = torch.distributions.Categorical(probs).sample()
     sample = sample.flatten()
     return sample
 
